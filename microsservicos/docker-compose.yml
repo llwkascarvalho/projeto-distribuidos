@@ -1,0 +1,177 @@
+version: "3.9"
+
+# ─────────────────────────────────────────────────────────────
+#  Microsserviços — Sistema de Pedidos de Lanchonete
+#
+#  Serviços:        Porta
+#    pedidos        8001  → http://localhost:8001/docs
+#    cardapio       8002  → http://localhost:8002/docs
+#    pagamento      8003  → http://localhost:8003/docs
+#    notificacao    8004  → http://localhost:8004/docs
+#
+#  Infraestrutura:
+#    db_pedidos     5441
+#    db_cardapio    5442
+#    db_pagamento   5443
+#    db_notificacao 5444
+#    rabbitmq       5672 (AMQP) / 15672 (Management UI)
+# ─────────────────────────────────────────────────────────────
+
+services:
+
+  # ── Bancos de dados ────────────────────────────────────────
+
+  db_pedidos:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: pedidos_db
+    ports:
+      - "5441:5432"
+    volumes:
+      - pgdata_pedidos:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d pedidos_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  db_cardapio:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: cardapio_db
+    ports:
+      - "5442:5432"
+    volumes:
+      - pgdata_cardapio:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d cardapio_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  db_pagamento:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: pagamento_db
+    ports:
+      - "5443:5432"
+    volumes:
+      - pgdata_pagamento:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d pagamento_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  db_notificacao:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: notificacao_db
+    ports:
+      - "5444:5432"
+    volumes:
+      - pgdata_notificacao:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d notificacao_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ── Mensageria ─────────────────────────────────────────────
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    ports:
+      - "5672:5672"    # AMQP
+      - "15672:15672"  # Management UI (guest/guest)
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+
+  # ── Microsserviços ─────────────────────────────────────────
+
+  pedidos:
+    build: ./pedidos
+    ports:
+      - "8001:8001"
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_HOST: db_pedidos
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: pedidos_db
+    depends_on:
+      db_pedidos:
+        condition: service_healthy
+
+  cardapio:
+    build: ./cardapio
+    ports:
+      - "8002:8002"
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_HOST: db_cardapio
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: cardapio_db
+    depends_on:
+      db_cardapio:
+        condition: service_healthy
+
+  pagamento:
+    build: ./pagamento
+    ports:
+      - "8003:8003"
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_HOST: db_pagamento
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: pagamento_db
+      PEDIDOS_URL: http://pedidos:8001
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      HTTP_TIMEOUT: "5"
+      MAX_RETRIES: "3"
+    depends_on:
+      db_pagamento:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      pedidos:
+        condition: service_started
+
+  notificacao:
+    build: ./notificacao
+    ports:
+      - "8004:8004"
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_HOST: db_notificacao
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: notificacao_db
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+    depends_on:
+      db_notificacao:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+volumes:
+  pgdata_pedidos:
+  pgdata_cardapio:
+  pgdata_pagamento:
+  pgdata_notificacao:
+  rabbitmq_data:
