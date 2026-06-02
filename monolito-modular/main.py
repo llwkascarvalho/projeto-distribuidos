@@ -1,9 +1,12 @@
 from fastapi import FastAPI
 from sqlalchemy import text
 from app.shared.database import engine, Base
+import app.cardapio.models
+import app.notificacao.models
+from app.cardapio.router import router as cardapio_router
+from app.notificacao.router import router as notificacao_router
 
 def criar_schemas():
-    """Cria os schemas do PostgreSQL antes das tabelas."""
     with engine.connect() as conn:
         for schema in ("pedidos", "cardapio", "pagamento", "notificacao"):
             conn.execute(text(f"CREATE SCHEMA IF NOT EXISTS {schema}"))
@@ -17,6 +20,9 @@ app = FastAPI(
     description="Sistema de pedidos de lanchonete — Versão 2 (Monólito Modular).",
     version="2.0.0",
 )
+
+app.include_router(cardapio_router)
+app.include_router(notificacao_router)
 
 @app.get("/health", tags=["Health"])
 def health():
