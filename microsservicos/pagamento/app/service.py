@@ -111,9 +111,9 @@ def processar_pagamento(db: Session, pedido_id: int) -> dict:
             "status_pagamento": "aprovado",
             "status_pedido": "pago",
             "mensagem": (
-                "Pagamento aprovado. Cozinha notificada via fila."
+                "Pagamento aprovado. Evento enviado para a fila com sucesso."
                 if publicado
-                else "Pagamento aprovado. Notificação pendente (fila temporariamente indisponível)."
+                else "Pagamento aprovado. Evento pendente (RabbitMQ indisponível)."
             ),
         }
     else:
