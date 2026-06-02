@@ -133,7 +133,7 @@ O pagamento **é aprovado normalmente**. A resposta será:
 {
   "status_pagamento": "aprovado",
   "status_pedido": "pago",
-  "mensagem": "Pagamento aprovado. Notificação pendente (fila temporariamente indisponível)."
+  "mensagem": "Pagamento aprovado. Evento enviado para a fila com sucesso."
 }
 ```
 
